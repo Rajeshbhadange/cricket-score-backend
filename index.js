@@ -11,8 +11,7 @@ const io = new Server(server, {
 });
 const cors = require("cors");
 const ScoreModel = require("./database/models/Score");
-const connectToDB = require("./database/init");
-const exp = require("constants");
+const connectToDB = require("./database/Connectdb");
 const jwt = require("jsonwebtoken");
 
 const secretKey = process.env.SECRET_KEY;
@@ -26,42 +25,23 @@ let ID = "";
 app.use(express.json());
 
 function calculateMoveValue(value) {
-  if (200 < value && value < 300) {
-    return 10;
-  }
-  if (301 < value && value < 340) {
-    return 20;
-  }
-  if (340 < value && value < 400) {
-    return 30;
-  }
-  if (401 < value && value < 500) {
-    return 20;
-  }
-  if (501 < value && value < 600) {
-    return 60;
-  }
-  if (600 < value && value < 700) {
-    return 70;
-  }
-  if (701 < value && value < 800) {
-    return 80;
-  }
-  if (801 < value && value < 899) {
-    return 100;
-  }
-  if (900 < value && value < 1100) {
-    return 130;
-  }
-  if (1100 < value && value < 1500) {
-    return 120;
-  }
+  if (200 < value && value < 300) return 10;
+  if (301 < value && value < 340) return 20;
+  if (340 < value && value < 400) return 30;
+  if (401 < value && value < 500) return 20;
+  if (501 < value && value < 600) return 60;
+  if (600 < value && value < 700) return 70;
+  if (701 < value && value < 800) return 80;
+  if (801 < value && value < 899) return 100;
+  if (900 < value && value < 1100) return 130;
+  if (1100 < value && value < 1500) return 120;
 
-  // Add a default value or handle cases where the value doesn't match any condition
   return 0;
 }
 
 io.on("connection", (socket) => {
+  console.log("A user connected to the server.");
+
   socket.on("getmatchId", () => {
     io.emit("id", ID);
   });
@@ -72,6 +52,7 @@ io.on("connection", (socket) => {
 
   socket.on("startingNewMatchFromAdmin", () => {
     ID = "";
+    console.log("A new match has started.");
     socket.broadcast.emit("startingNewMatchToUser");
   });
 
@@ -87,47 +68,48 @@ io.on("connection", (socket) => {
         moveValue,
         overNo,
       } = data;
-      console.log(widthValue);
+
       if (!matchId && ID == "") {
-        let overArr = [];
-        overArr.push({ 0: "", 1: "", 2: "", 3: "", 4: "", 5: "" });
+        let overArr = [{ 0: "", 1: "", 2: "", 3: "", 4: "", 5: "" }];
         overArr[overNo][currentBall] = value;
         let Overs = { 0: "", 1: "", 2: "", 3: "", 4: "", 5: "" };
         Overs[currentBall] = value;
+
         const scoreData = {
-          totalRuns: value == "Out" ? 0 : value,
-          overNo: overNo,
+          totalRuns: value === "Out" ? 0 : value,
+          overNo,
           ballNo: currentBall + 1,
-          totalWickets: value == "Out" ? wickets + 1 : 0,
+          totalWickets: value === "Out" ? wickets + 1 : 0,
           currentOver: Overs,
           allOvers: overArr,
           moveValue: calculateMoveValue(widthValue),
         };
+
         const storedScore = await ScoreModel.create(scoreData);
         data.matchId = storedScore._id;
         ID = storedScore._id;
         socket.emit("matchId", storedScore._id);
+        console.log("New match data created with ID:", storedScore._id);
       } else {
         let sId = matchId ? matchId : ID;
-
         const storedScore = await ScoreModel.findById({ _id: sId });
         let recentOvers = storedScore.allOvers;
         const storedOver =
-          currentBall == 5
+          currentBall === 5
             ? { 0: "", 1: "", 2: "", 3: "", 4: "", 5: "" }
             : storedScore.currentOver;
         let recentOverNo = storedScore.overNo;
-        currentBall != 5 ? (storedOver[currentBall] = value) : "";
-        let ball = currentBall == 5 ? 0 : currentBall + 1;
-        currentBall == 5 ? (recentOverNo = recentOverNo + 1) : "";
-        currentBall == 5
+        currentBall !== 5 ? (storedOver[currentBall] = value) : "";
+        let ball = currentBall === 5 ? 0 : currentBall + 1;
+        currentBall === 5 ? (recentOverNo += 1) : "";
+        currentBall === 5
           ? recentOvers.push({ 0: "", 1: "", 2: "", 3: "", 4: "", 5: "" })
-          : " ";
+          : "";
         recentOvers[overNo][currentBall] = value;
 
-        if (value == "Out") {
+        if (value === "Out") {
           let newWickets = storedScore.totalWickets + 1;
-          const updateScore = await ScoreModel.findByIdAndUpdate(
+          await ScoreModel.findByIdAndUpdate(
             { _id: sId },
             {
               totalWickets: newWickets,
@@ -140,7 +122,7 @@ io.on("connection", (socket) => {
           );
         } else {
           let newScore = storedScore.totalRuns + value;
-          const updateScore = await ScoreModel.findByIdAndUpdate(
+          await ScoreModel.findByIdAndUpdate(
             { _id: sId },
             {
               totalRuns: newScore,
@@ -158,53 +140,60 @@ io.on("connection", (socket) => {
         if (!matchId) {
           socket.emit("matchId", ID);
         }
+        console.log("Match data updated successfully.");
       }
 
       setTimeout(() => {
         socket.broadcast.emit("score", data);
       }, 1000);
     } catch (err) {
-      console.log(err.message);
+      console.error("Error publishing score:", err.message);
     }
   });
 
-  socket.on("disconnect", () =>
-    console.log("someone Disconnected from server")
-  );
+  socket.on("disconnect", () => {
+    console.log("A user disconnected from the server.");
+  });
 });
 
-app.get("/getMatchData", async function (req, res) {
+app.get("/getMatchData", async (req, res) => {
   try {
     const { id } = req.headers;
     const matchData = await ScoreModel.findById(id);
     if (matchData) {
       return res.json({ success: true, matchData });
     } else {
-      return res.json({ success: false, message: "some thing went wrong" });
+      return res.json({ success: false, message: "Match data not found." });
     }
   } catch (err) {
-    return res.json(err.message);
+    console.error("Error fetching match data:", err.message);
+    return res.json({ success: false, message: err.message });
   }
 });
 
+// Admin login
 app.post("/adminlogin", (req, res) => {
   try {
     const { email, password } = req.body;
     if (email === "admin@gmail.com" && password === "pass@123") {
       const token = jwt.sign({ email }, secretKey);
       res.json({ success: true, token });
+      console.log("Admin logged in successfully.");
     } else {
-      res.status(401).json({ success: false, message: "Invalid credentials" });
+      res
+        .status(401)
+        .json({ success: false, message: "Invalid email or password." });
     }
   } catch (err) {
-    return res.json({ success: false, message: err.message });
+    console.error("Error during admin login:", err.message);
+    res.json({ success: false, message: err.message });
   }
 });
 
-app.get("/", function (req, res) {
-  return res.json("Connected to backend");
+app.get("/", (req, res) => {
+  res.json("Successfully connected to the server.");
 });
 
 server.listen(PORT, () => {
-  console.log("server running at http://localhost:" + PORT);
+  console.log(`Server is running at http://localhost:${PORT}`);
 });

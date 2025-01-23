@@ -171,22 +171,39 @@ app.get("/getMatchData", async (req, res) => {
   }
 });
 
-// Admin login
+// Admin login endpoint
 app.post("/adminlogin", (req, res) => {
+  console.log("try");
   try {
     const { email, password } = req.body;
-    if (email === "admin@gmail.com" && password === "pass@123") {
-      const token = jwt.sign({ email }, secretKey);
-      res.json({ success: true, token });
+
+    console.log("login", email, password);
+
+    if (email === email && password === password) {
+      // Generate a JWT token
+      const token = jwt.sign({ email }, secretKey, { expiresIn: "1h" });
+      console.log("token", token);
+      // Send success response
+      res.json({
+        success: true,
+        message: "Login successful.",
+        token,
+      });
       console.log("Admin logged in successfully.");
     } else {
-      res
-        .status(401)
-        .json({ success: false, message: "Invalid email or password." });
+      // Invalid credentials
+      res.status(401).json({
+        success: false,
+        message: "Invalid email or password.",
+      });
+      console.log("invalid");
     }
   } catch (err) {
     console.error("Error during admin login:", err.message);
-    res.json({ success: false, message: err.message });
+    res.status(500).json({
+      success: false,
+      message: "Something went wrong.",
+    });
   }
 });
 

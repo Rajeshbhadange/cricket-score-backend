@@ -2,7 +2,7 @@
   "name": "backend",
   "version": "1.0.0",
   "main": "index.js",
-  "build": "your-build-command-here",
+  "build": "react-scripts build",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },

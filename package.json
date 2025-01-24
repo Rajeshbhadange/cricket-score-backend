@@ -2,11 +2,8 @@
   "name": "backend",
   "version": "1.0.0",
   "main": "index.js",
-  "build": "react-scripts build",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "react-scripts start",
-    "eject": "react-scripts eject"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Rajesh",
   "license": "ISC",
